@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * @swagger
- * /api/v1/config:
+ * /api/config:
  *   get:
  *     tags: [Core]
  *     summary: Check environment variable configuration

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authService } from '@/lib/services/auth/auth-service';
-import { LoginRequestSchema } from '@/lib/types/auth';
+import { passwordResetService } from '@/lib/services/auth/password-reset-service';
+import { ConfirmPasswordResetRequestSchema } from '@/lib/types/auth';
 import type { ErrorResponse } from '@/lib/types/auth';
 
 export async function OPTIONS() {
@@ -16,50 +16,39 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/login:
+ * /api/auth/password-reset/confirm:
  *   post:
  *     tags: [Auth]
- *     summary: Authenticate an existing user
- *     description: Login with email and password credentials
+ *     summary: Confirm password reset
+ *     description: Reset password using a valid reset token
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, password]
+ *             required: [token, newPassword]
  *             properties:
- *               email:
+ *               token:
  *                 type: string
- *                 format: email
- *                 example: "user@example.com"
- *               password:
+ *                 description: Password reset token
+ *               newPassword:
  *                 type: string
- *                 example: "SecurePass123!"
+ *                 minLength: 12
+ *                 maxLength: 100
+ *                 description: New password (must meet strength requirements)
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Password reset successful
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 user:
- *                   type: object
- *                 accessToken:
+ *                 message:
  *                   type: string
- *                 refreshToken:
- *                   type: string
- *                 accessTokenExpiresAt:
- *                   type: string
- *                   format: date-time
- *                 refreshTokenExpiresAt:
- *                   type: string
- *                   format: date-time
  *       400:
- *         description: Invalid request data
- *       401:
- *         description: Invalid credentials
+ *         description: Invalid token or password validation failed
  *         content:
  *           application/json:
  *             schema:
@@ -73,7 +62,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const validation = LoginRequestSchema.safeParse(body);
+    const validation = ConfirmPasswordResetRequestSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json<ErrorResponse>(
@@ -90,18 +79,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const response = await authService.loginAsync(validation.data);
+    const result = await passwordResetService.performPasswordResetRequest(
+      validation.data.token,
+      validation.data.newPassword
+    );
 
-    return NextResponse.json(response);
+    if (!result.isSuccess) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          message: result.errorMessage || 'Invalid or expired token',
+          errorCode: 'PASSWORD_RESET_FAILED',
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      message: 'Password has been reset successfully. You can now log in with your new password.',
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invalid email or password';
+    const message = error instanceof Error ? error.message : 'Password reset failed';
 
     return NextResponse.json<ErrorResponse>(
       {
-        message: 'Invalid email or password',
-        errorCode: 'INVALID_CREDENTIALS',
+        message,
+        errorCode: 'PASSWORD_RESET_FAILED',
       },
-      { status: 401 }
+      { status: 400 }
     );
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { passwordResetService } from '@/lib/services/auth/password-reset-service';
-import { ConfirmPasswordResetRequestSchema } from '@/lib/types/auth';
+import { authService } from '@/lib/services/auth/auth-service';
+import { RefreshTokenRequestSchema } from '@/lib/types/auth';
 import type { ErrorResponse } from '@/lib/types/auth';
 
 export async function OPTIONS() {
@@ -16,39 +16,44 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/password-reset/confirm:
+ * /api/auth/refresh:
  *   post:
  *     tags: [Auth]
- *     summary: Confirm password reset
- *     description: Reset password using a valid reset token
+ *     summary: Refresh access token
+ *     description: Get a new access token using a valid refresh token
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [token, newPassword]
+ *             required: [refreshToken]
  *             properties:
- *               token:
+ *               refreshToken:
  *                 type: string
- *                 description: Password reset token
- *               newPassword:
- *                 type: string
- *                 minLength: 12
- *                 maxLength: 100
- *                 description: New password (must meet strength requirements)
+ *                 description: The refresh token to use
  *     responses:
  *       200:
- *         description: Password reset successful
+ *         description: Token refreshed successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 user:
+ *                   type: object
+ *                 accessToken:
  *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 accessTokenExpiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                 refreshTokenExpiresAt:
+ *                   type: string
+ *                   format: date-time
  *       400:
- *         description: Invalid token or password validation failed
+ *         description: Invalid or expired refresh token
  *         content:
  *           application/json:
  *             schema:
@@ -62,7 +67,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const validation = ConfirmPasswordResetRequestSchema.safeParse(body);
+    const validation = RefreshTokenRequestSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json<ErrorResponse>(
@@ -79,31 +84,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await passwordResetService.performPasswordResetRequest(
-      validation.data.token,
-      validation.data.newPassword
-    );
+    const response = await authService.refreshTokenAsync(validation.data.refreshToken);
 
-    if (!result.isSuccess) {
-      return NextResponse.json<ErrorResponse>(
-        {
-          message: result.errorMessage || 'Invalid or expired token',
-          errorCode: 'PASSWORD_RESET_FAILED',
-        },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      message: 'Password has been reset successfully. You can now log in with your new password.',
-    });
+    return NextResponse.json(response);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Password reset failed';
+    const message = error instanceof Error ? error.message : 'Invalid or expired refresh token';
 
     return NextResponse.json<ErrorResponse>(
       {
         message,
-        errorCode: 'PASSWORD_RESET_FAILED',
+        errorCode: 'INVALID_REFRESH_TOKEN',
       },
       { status: 400 }
     );

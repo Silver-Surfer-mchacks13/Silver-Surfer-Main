@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/register:
+ * /api/auth/register:
  *   post:
  *     tags: [Auth]
  *     summary: Register a new user account
@@ -95,18 +95,37 @@ export async function OPTIONS() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          message: 'Invalid request data',
+          errors: { body: ['Invalid JSON'] },
+        },
+        {
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
     const validation = RegisterRequestSchema.safeParse(body);
 
     if (!validation.success) {
       const errors: Record<string, string[]> = {};
-      validation.error.errors.forEach((err) => {
-        const path = err.path.join('.');
-        if (!errors[path]) {
-          errors[path] = [];
-        }
-        errors[path].push(err.message);
-      });
+      if (validation.error && validation.error.errors) {
+        validation.error.errors.forEach((err) => {
+          const path = err.path.join('.');
+          if (!errors[path]) {
+            errors[path] = [];
+          }
+          errors[path].push(err.message);
+        });
+      }
 
       return NextResponse.json<ErrorResponse>(
         {

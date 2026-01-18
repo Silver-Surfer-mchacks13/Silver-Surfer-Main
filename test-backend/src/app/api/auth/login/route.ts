@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/lib/services/auth/auth-service';
-import { RefreshTokenRequestSchema } from '@/lib/types/auth';
+import { LoginRequestSchema } from '@/lib/types/auth';
 import type { ErrorResponse } from '@/lib/types/auth';
 
 export async function OPTIONS() {
@@ -16,25 +16,29 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/refresh:
+ * /api/auth/login:
  *   post:
  *     tags: [Auth]
- *     summary: Refresh access token
- *     description: Get a new access token using a valid refresh token
+ *     summary: Authenticate an existing user
+ *     description: Login with email and password credentials
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [refreshToken]
+ *             required: [email, password]
  *             properties:
- *               refreshToken:
+ *               email:
  *                 type: string
- *                 description: The refresh token to use
+ *                 format: email
+ *                 example: "user@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecurePass123!"
  *     responses:
  *       200:
- *         description: Token refreshed successfully
+ *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
@@ -53,7 +57,9 @@ export async function OPTIONS() {
  *                   type: string
  *                   format: date-time
  *       400:
- *         description: Invalid or expired refresh token
+ *         description: Invalid request data
+ *       401:
+ *         description: Invalid credentials
  *         content:
  *           application/json:
  *             schema:
@@ -66,36 +72,54 @@ export async function OPTIONS() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const validation = RefreshTokenRequestSchema.safeParse(body);
-
-    if (!validation.success) {
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
       return NextResponse.json<ErrorResponse>(
         {
           message: 'Invalid request data',
-          errors: validation.error.errors.reduce((acc, err) => {
-            const path = err.path.join('.');
-            if (!acc[path]) acc[path] = [];
-            acc[path].push(err.message);
-            return acc;
-          }, {} as Record<string, string[]>),
+          errors: { body: ['Invalid JSON'] },
         },
         { status: 400 }
       );
     }
 
-    const response = await authService.refreshTokenAsync(validation.data.refreshToken);
+    const validation = LoginRequestSchema.safeParse(body);
+
+    if (!validation.success) {
+      const errors: Record<string, string[]> = {};
+      if (validation.error && validation.error.errors) {
+        validation.error.errors.forEach((err) => {
+          const path = err.path.join('.');
+          if (!errors[path]) {
+            errors[path] = [];
+          }
+          errors[path].push(err.message);
+        });
+      }
+
+      return NextResponse.json<ErrorResponse>(
+        {
+          message: 'Invalid request data',
+          errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const response = await authService.loginAsync(validation.data);
 
     return NextResponse.json(response);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invalid or expired refresh token';
+    const message = error instanceof Error ? error.message : 'Invalid email or password';
 
     return NextResponse.json<ErrorResponse>(
       {
-        message,
-        errorCode: 'INVALID_REFRESH_TOKEN',
+        message: 'Invalid email or password',
+        errorCode: 'INVALID_CREDENTIALS',
       },
-      { status: 400 }
+      { status: 401 }
     );
   }
 }

@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/password-reset/request:
+ * /api/auth/password-reset/request:
  *   post:
  *     tags: [Auth]
  *     summary: Request password reset

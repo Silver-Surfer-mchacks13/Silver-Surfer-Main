@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/me:
+ * /api/auth/me:
  *   get:
  *     tags: [Auth]
  *     summary: Get current user information

@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 /**
  * @swagger
- * /api/v1/auth/oauth:
+ * /api/auth/oauth:
  *   post:
  *     tags: [Auth]
  *     summary: Authenticate with OAuth provider
