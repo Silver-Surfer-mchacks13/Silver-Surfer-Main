@@ -227,7 +227,8 @@ export async function POST(req: NextRequest) {
       userId: userId || 'anonymous',
       hasScreenshot: !!page_state.screenshot,
       screenshotLength: page_state.screenshot?.length || 0,
-      htmlLength: page_state.html?.length || 0,
+      hasDistilledDOM: !!page_state.distilledDOM,
+      elementCount: page_state.distilledDOM?.elements?.length || 0,
       url: page_state.url
     });
 
@@ -249,7 +250,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Process the request with the agent
-    const { actions, complete } = await processUserRequest(message, page_state);
+    const { actions, complete, needsObservation } = await processUserRequest(message, page_state);
 
     // Store agent responses (extract text from message actions)
     for (const action of actions) {
@@ -280,6 +281,7 @@ export async function POST(req: NextRequest) {
       session_id: taskSession.id,
       actions,
       complete,
+      needs_observation: needsObservation,
     };
 
     return NextResponse.json(response, {
