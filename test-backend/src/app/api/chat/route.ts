@@ -41,18 +41,20 @@ export async function POST(req: NextRequest) {
       title,
       hasScreenshot: !!page_state.screenshot,
       screenshotLength: page_state.screenshot?.length || 0,
-      htmlLength: page_state.html?.length || 0,
+      hasDistilledDOM: !!page_state.distilledDOM,
+      elementCount: page_state.distilledDOM?.elements?.length || 0,
       url: page_state.url
     });
 
     // Process the request with the agent - use the actual user message
-    const { actions, complete } = await processUserRequest(message, page_state);
+    const { actions, complete, needsObservation } = await processUserRequest(message, page_state);
 
     // Build the response
     const response: ConversationResponse = {
       session_id: session_id || crypto.randomUUID(),
       actions,
       complete,
+      needs_observation: needsObservation,
     };
 
     return NextResponse.json(response, {
