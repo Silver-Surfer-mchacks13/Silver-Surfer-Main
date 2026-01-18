@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'OAuth authentication failed';
-    
+
     if (message.includes('not configured') || message.includes('required')) {
       return NextResponse.json<ErrorResponse>(
         {

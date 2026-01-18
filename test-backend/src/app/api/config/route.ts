@@ -71,11 +71,11 @@ export async function GET(req: NextRequest) {
   const supabaseConnectionString = process.env.SUPABASE_CONNECTION_STRING;
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
   let supabaseConfigured = false;
   let supabaseUrlDisplay = 'Not configured';
   let supabaseProjectRef: string | null = null;
-  
+
   if (supabaseConnectionString) {
     const postgresMatch = supabaseConnectionString.match(/postgres\.([a-zA-Z0-9]+)/);
     if (postgresMatch) {

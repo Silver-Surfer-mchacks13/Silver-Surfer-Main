@@ -4,6 +4,10 @@ import type { ConversationRequest, ConversationResponse } from "@/lib/types";
 import { optionalAuth } from "@/lib/utils/auth";
 import { conversationService } from "@/lib/services/conversation/conversation-service";
 
+// Extend the timeout for this route (Next.js default is 10s for Hobby, 60s for Pro)
+// Set to 150 seconds to allow for agent processing with large screenshots
+export const maxDuration = 150;
+
 /**
  * @swagger
  * /api/chat:
@@ -252,24 +256,68 @@ export async function POST(req: NextRequest) {
     // Process the request with the agent
     const { actions, complete, needsObservation } = await processUserRequest(message, page_state);
 
-    // Store agent responses (extract text from message actions)
+    // Store all agent actions in their respective tables
     for (const action of actions) {
-      if (action.action_type === 'message') {
-        await conversationService.storeMessage(
-          taskSession.id,
-          userId,
-          'assistant',
-          action.message,
-          page_state.url
-        );
-      } else if (action.action_type === 'complete') {
-        await conversationService.storeMessage(
-          taskSession.id,
-          userId,
-          'assistant',
-          action.message,
-          page_state.url
-        );
+      switch (action.action_type) {
+        case 'message':
+          // Store in both ConversationMessages (for chat history) and MessageAgentActions (for action tracking)
+          await conversationService.storeMessage(
+            taskSession.id,
+            userId,
+            'assistant',
+            action.message,
+            page_state.url
+          );
+          await conversationService.storeMessageAction(
+            taskSession.id,
+            action.message,
+            action.reasoning,
+            page_state.url
+          );
+          break;
+
+        case 'complete':
+          // Store in both ConversationMessages (for chat history) and CompleteAgentActions (for action tracking)
+          await conversationService.storeMessage(
+            taskSession.id,
+            userId,
+            'assistant',
+            action.message,
+            page_state.url
+          );
+          await conversationService.storeCompleteAction(
+            taskSession.id,
+            action.message,
+            action.reasoning,
+            page_state.url
+          );
+          break;
+
+        case 'click':
+          await conversationService.storeClickAction(
+            taskSession.id,
+            action.x_path,
+            action.reasoning,
+            page_state.url
+          );
+          break;
+
+        case 'wait':
+          await conversationService.storeWaitAction(
+            taskSession.id,
+            action.duration,
+            action.reasoning,
+            page_state.url
+          );
+          break;
+
+        // Other action types (highlight, scroll, fill_form, etc.) don't have dedicated tables
+        // They're still returned in the response but not persisted separately
+        // This matches the database schema which only has tables for click, wait, message, and complete
+        default:
+          // Actions like highlight, scroll, fill_form, etc. are not stored in separate tables
+          // They're part of the conversation flow but don't need separate tracking
+          break;
       }
     }
 

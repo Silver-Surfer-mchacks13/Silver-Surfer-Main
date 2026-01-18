@@ -137,6 +137,127 @@ export class ConversationService {
 
     return (sessions || []) as TaskSession[];
   }
+
+  /**
+   * Get a session by ID, verifying it belongs to the user
+   * Throws error if session not found or doesn't belong to user
+   */
+  async getSessionById(sessionId: string, userId: string): Promise<TaskSession> {
+    const { data: session, error } = await table('TaskSessions')
+      .select('*')
+      .eq('id', sessionId)
+      .eq('UserId', userId)
+      .single();
+
+    if (error || !session) {
+      throw new Error(`Session not found or access denied: ${error?.message || 'Session not found'}`);
+    }
+
+    return session as TaskSession;
+  }
+
+  /**
+   * Store a click action
+   */
+  async storeClickAction(
+    sessionId: string,
+    target: string,
+    reasoning: string | undefined,
+    pageUrl: string
+  ): Promise<void> {
+    const { error } = await table('ClickAgentActions')
+      .insert({
+        SessionId: sessionId,
+        Target: target,
+        Reasoning: reasoning || '',
+        Success: false, // Will be updated when action is executed
+        ErrorMessage: null,
+        PageUrl: pageUrl,
+        PageHtml: null, // Can be populated later if needed
+        CreatedAt: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Error storing click action:', error);
+      // Don't throw - action storage is not critical for conversation flow
+    }
+  }
+
+  /**
+   * Store a wait action
+   */
+  async storeWaitAction(
+    sessionId: string,
+    duration: number,
+    reasoning: string | undefined,
+    pageUrl: string
+  ): Promise<void> {
+    const { error } = await table('WaitAgentActions')
+      .insert({
+        SessionId: sessionId,
+        Duration: duration,
+        Reasoning: reasoning || '',
+        Success: false, // Will be updated when action is executed
+        ErrorMessage: null,
+        PageUrl: pageUrl,
+        PageHtml: null,
+        CreatedAt: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Error storing wait action:', error);
+    }
+  }
+
+  /**
+   * Store a complete action
+   */
+  async storeCompleteAction(
+    sessionId: string,
+    message: string,
+    reasoning: string | undefined,
+    pageUrl: string
+  ): Promise<void> {
+    const { error } = await table('CompleteAgentActions')
+      .insert({
+        SessionId: sessionId,
+        Message: message,
+        Reasoning: reasoning || '',
+        Success: false,
+        ErrorMessage: null,
+        PageUrl: pageUrl,
+        PageHtml: null,
+        CreatedAt: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Error storing complete action:', error);
+    }
+  }
+
+  /**
+   * Store a message action (assistant message)
+   */
+  async storeMessageAction(
+    sessionId: string,
+    message: string,
+    reasoning: string | undefined,
+    pageUrl: string
+  ): Promise<void> {
+    const { error } = await table('MessageAgentActions')
+      .insert({
+        SessionId: sessionId,
+        Message: message,
+        Reasoning: reasoning || '',
+        PageUrl: pageUrl,
+        PageHtml: null,
+        CreatedAt: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Error storing message action:', error);
+    }
+  }
 }
 
 // Export singleton instance

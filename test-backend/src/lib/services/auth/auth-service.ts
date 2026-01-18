@@ -208,7 +208,7 @@ export class AuthService {
         .select('*')
         .eq('id', emailUser.id)
         .single();
-      
+
       if (existingUser) {
         return this.generateAuthResponseAsync(existingUser as User);
       }
