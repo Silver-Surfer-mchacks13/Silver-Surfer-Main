@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
 
     if (!validation.success) {
       const errors: Record<string, string[]> = {};
-      if (validation.error && validation.error.errors) {
-        validation.error.errors.forEach((err) => {
+      if (validation.error && validation.error.issues) {
+        validation.error.issues.forEach((err) => {
           const path = err.path.join('.');
           if (!errors[path]) {
             errors[path] = [];

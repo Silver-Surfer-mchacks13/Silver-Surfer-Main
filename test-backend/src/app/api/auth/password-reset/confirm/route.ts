@@ -65,15 +65,21 @@ export async function POST(req: NextRequest) {
     const validation = ConfirmPasswordResetRequestSchema.safeParse(body);
 
     if (!validation.success) {
+      const errors: Record<string, string[]> = {};
+      if (validation.error && validation.error.issues) {
+        validation.error.issues.forEach((err) => {
+          const path = err.path.join('.');
+          if (!errors[path]) {
+            errors[path] = [];
+          }
+          errors[path].push(err.message);
+        });
+      }
+
       return NextResponse.json<ErrorResponse>(
         {
           message: 'Invalid request data',
-          errors: validation.error.errors.reduce((acc, err) => {
-            const path = err.path.join('.');
-            if (!acc[path]) acc[path] = [];
-            acc[path].push(err.message);
-            return acc;
-          }, {} as Record<string, string[]>),
+          errors,
         },
         { status: 400 }
       );

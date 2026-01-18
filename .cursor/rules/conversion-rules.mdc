@@ -1,0 +1,10 @@
+---
+name: conversion-rules
+description: Rules when asked to convert certain functionality from the referenced .NET project.
+---
+
+# Overview
+
+There is a .NET project at ./context relative to the whole project root. A goal is to convert as much of the core functionality there from C# ASP.NET to ts Next.js. 
+
+- When converting endpoints, remove the `v1` prefix.

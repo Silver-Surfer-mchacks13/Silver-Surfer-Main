@@ -127,20 +127,34 @@ export class AuthService {
 
     // Validate token/code
     let validationResult;
-    if (request.authorizationCode) {
-      if (!request.redirectUri) {
-        throw new Error('Redirect URI is required for authorization code flow');
+    try {
+      if (request.authorizationCode) {
+        if (!request.redirectUri) {
+          throw new Error('Redirect URI is required for authorization code flow');
+        }
+        validationResult = await validator.validateAuthorizationCodeAsync(
+          request.authorizationCode,
+          request.redirectUri,
+          clientId,
+          clientSecret
+        );
+      } else if (request.idToken) {
+        validationResult = await validator.validateIdTokenAsync(request.idToken, clientId);
+      } else {
+        throw new Error('Either IdToken or AuthorizationCode must be provided');
       }
-      validationResult = await validator.validateAuthorizationCodeAsync(
-        request.authorizationCode,
-        request.redirectUri,
-        clientId,
-        clientSecret
-      );
-    } else if (request.idToken) {
-      validationResult = await validator.validateIdTokenAsync(request.idToken, clientId);
-    } else {
-      throw new Error('Either IdToken or AuthorizationCode must be provided');
+    } catch (error) {
+      // Re-throw validation errors with context
+      if (error instanceof Error) {
+        if (error.message.includes('not configured')) {
+          throw new Error(`${provider} OAuth is not properly configured: ${error.message}`);
+        }
+        if (error.message.includes('expired') || error.message.includes('invalid')) {
+          throw new Error(`${provider} token validation failed: ${error.message}`);
+        }
+        throw error;
+      }
+      throw new Error(`${provider} OAuth validation failed`);
     }
 
     // Use generic OAuth login method
@@ -170,15 +184,26 @@ export class AuthService {
       return this.generateAuthResponseAsync(existingUser as User);
     }
 
-    // Check if email already exists for this provider
+    // Check if email already exists for a different provider (account conflict)
     const { data: emailUser } = await table('users')
-      .select('id')
+      .select('id, provider')
       .eq('email', email.toLowerCase())
-      .eq('provider', provider)
       .single();
 
-    if (emailUser) {
-      throw new Error(`A ${provider} account with this email already exists`);
+    if (emailUser && emailUser.provider !== provider) {
+      throw new Error(`An account with this email already exists with ${emailUser.provider} provider. Please use ${emailUser.provider} to sign in.`);
+    }
+
+    if (emailUser && emailUser.provider === provider) {
+      // This shouldn't happen if we checked ProviderUserId first, but handle it gracefully
+      const { data: existingUser } = await table('users')
+        .select('*')
+        .eq('id', emailUser.id)
+        .single();
+      
+      if (existingUser) {
+        return this.generateAuthResponseAsync(existingUser as User);
+      }
     }
 
     // Create new account for this provider

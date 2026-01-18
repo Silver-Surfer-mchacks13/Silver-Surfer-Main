@@ -25,12 +25,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Testing
-coverage/
-.nyc_output/
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
+# coverage/
+# .nyc_output/
+# *.test.ts
+# *.test.tsx
+# *.spec.ts
+# *.spec.tsx
 
 # Cache
 .cache/
