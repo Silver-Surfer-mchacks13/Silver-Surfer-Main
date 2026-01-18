@@ -21,7 +21,8 @@ You can perform these actions on the user's behalf:
 5. **Magnify text** - Make small text larger and more readable
 6. **Scroll** - Bring important content into view
 7. **Remove clutter** - Hide distracting ads, popups, and banners
-8. **Send messages** - Communicate explanations and guidance
+8. **Remove fraudulent popups** - Immediately hide scams and reassure the user with a gentle overlay
+9. **Send messages** - Communicate explanations and guidance
 
 ## Important Guidelines
 1. **Safety First**: Never perform financial transactions, deletions, or account changes without explicit user consent
@@ -65,6 +66,7 @@ function mapToolToActionType(toolName: string): string {
     select_dropdown: "select_dropdown",
     remove_clutter: "remove_clutter",
     restore_clutter: "restore_clutter",
+    remove_fraud_popup: "remove_fraud_popup",
     wait: "wait",
     send_message: "message",
     complete_task: "complete",
@@ -157,6 +159,15 @@ function toolCallToAction(toolCall: {
     case "restore_clutter":
       return {
         action_type: "restore_clutter",
+        timestamp,
+        reasoning: args.reasoning as string | undefined,
+      };
+
+    case "remove_fraud_popup":
+      return {
+        action_type: "remove_fraud_popup",
+        selector: args.selector as string,
+        overlay_text: args.overlay_text as string | undefined,
         timestamp,
         reasoning: args.reasoning as string | undefined,
       };

@@ -53,6 +53,15 @@ export const restoreClutterSchema = z.object({
   reasoning: z.string().optional().describe("Why clutter is being restored"),
 });
 
+export const removeFraudPopupSchema = z.object({
+  selector: z.string().describe("The CSS selector of the fraudulent popup container to remove"),
+  overlay_text: z
+    .string()
+    .default("Fraudulent popup removed by Silver Surfer.")
+    .describe("Optional custom overlay message to reassure the user"),
+  reasoning: z.string().optional().describe("Why this popup is deemed fraudulent"),
+});
+
 export const waitSchema = z.object({
   duration: z.number().describe("Duration to wait in milliseconds"),
   reasoning: z.string().optional().describe("Why waiting is necessary"),
@@ -178,6 +187,18 @@ export const restoreClutterTool = tool(
   }
 );
 
+export const removeFraudPopupTool = tool(
+  async (input) => {
+    return JSON.stringify({ tool: "remove_fraud_popup", ...input });
+  },
+  {
+    name: "remove_fraud_popup",
+    description:
+      "Remove or hide a clearly fraudulent popup and add a gentle overlay letting the user know Silver Surfer removed it.",
+    schema: removeFraudPopupSchema,
+  }
+);
+
 export const waitTool = tool(
   async (input) => {
     return JSON.stringify({ tool: "wait", ...input });
@@ -223,6 +244,7 @@ export const allTools = [
   selectDropdownTool,
   removeClutterTool,
   restoreClutterTool,
+  removeFraudPopupTool,
   waitTool,
   sendMessageTool,
   completeTaskTool,

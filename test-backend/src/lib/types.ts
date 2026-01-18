@@ -13,7 +13,8 @@ export type ActionType =
   | "fill_form"
   | "select_dropdown"
   | "remove_clutter"
-  | "restore_clutter";
+  | "restore_clutter"
+  | "remove_fraud_popup";
 
 interface BaseAction {
   timestamp: string;
@@ -84,6 +85,12 @@ export interface RestoreClutterAction extends BaseAction {
   action_type: "restore_clutter";
 }
 
+export interface RemoveFraudPopupAction extends BaseAction {
+  action_type: "remove_fraud_popup";
+  selector: string;
+  overlay_text?: string;
+}
+
 export type ConversationAction =
   | ClickAction
   | WaitAction
@@ -97,7 +104,8 @@ export type ConversationAction =
   | FillFormAction
   | SelectDropdownAction
   | RemoveClutterAction
-  | RestoreClutterAction;
+  | RestoreClutterAction
+  | RemoveFraudPopupAction;
 
 export interface PageState {
   url: string;
