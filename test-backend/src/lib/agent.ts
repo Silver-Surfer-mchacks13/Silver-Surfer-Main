@@ -72,6 +72,7 @@ function createAgent() {
     modelName: process.env.OPENROUTER_MODEL || "openai/gpt-4o",
     temperature: 0,
     maxTokens: 4096,
+    timeout: 120000, // 120 seconds timeout for API calls
     configuration: {
       baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -434,8 +435,16 @@ export async function processUserRequest(
   try {
     console.log("Invoking agent with", messages.length, "messages");
 
-    // Invoke the model with tools
-    const response = await agent.invoke(messages);
+    // Invoke the model with tools, with a timeout wrapper
+    const timeoutMs = 120000; // 120 seconds
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Agent invocation timed out after 120 seconds")), timeoutMs);
+    });
+
+    const response = await Promise.race([
+      agent.invoke(messages),
+      timeoutPromise
+    ]) as Awaited<ReturnType<typeof agent.invoke>>;
 
     console.log("Agent response received");
     console.log("Tool calls:", response.tool_calls?.length || 0);
