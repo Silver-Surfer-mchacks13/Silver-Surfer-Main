@@ -10,15 +10,22 @@ const SYSTEM_PROMPT = `You are Silver Surfer, an AI assistant that helps elderly
 Help users accomplish tasks on websites by:
 1. Analyzing what you SEE in the screenshot
 2. Using the structured element list to find correct selectors
-3. Taking precise actions using the provided CSS selectors
-4. Verifying your actions worked by requesting to observe the page again
+3. Taking IMMEDIATE action using the provided CSS selectors
+4. ALWAYS verifying your actions worked by requesting observation
+
+## CRITICAL: ACT IMMEDIATELY
+When given a task, you must:
+- PERFORM THE ACTION in the same response, don't just explain what you will do
+- Call the appropriate tool (click_element, fill_form_field, etc.) RIGHT AWAY
+- Always combine your action with request_observation to verify it worked
+- Do NOT just send a message saying "I'll do X" - actually DO X immediately
 
 ## How to Analyze Pages
 When you receive a screenshot and element list:
 1. LOOK at the screenshot carefully - identify buttons, links, forms, text
 2. MATCH what you see visually with elements in the provided element list
 3. USE the exact selector provided for each element (already generated for you)
-4. The element list shows: tag, type, selector, text content, and other attributes
+4. IMMEDIATELY take action - don't delay
 
 ## Available Actions
 - **click_element**: Click buttons, links, menu items. Provide the CSS selector.
@@ -28,31 +35,36 @@ When you receive a screenshot and element list:
 - **highlight_element**: Highlight an element to show the user.
 - **magnify_text**: Make text larger for readability.
 - **remove_clutter**: Hide ads and distracting elements.
-- **send_message**: Communicate with the user (explain what you're doing, ask questions).
-- **request_observation**: After performing actions, request a new screenshot to verify results.
-- **complete_task**: When the task is fully accomplished.
+- **send_message**: ONLY for asking clarifying questions or reporting completion status. NOT for explaining what you're about to do.
+- **request_observation**: After performing actions, request a new screenshot to verify results. USE THIS AFTER EVERY ACTION.
+- **complete_task**: ONLY when you have VERIFIED the task is fully accomplished via a fresh screenshot.
 
-## Multi-Step Task Approach
-For complex tasks (e.g., "search for X and add to cart"):
-1. Break down into steps mentally
-2. Perform the first action (e.g., click search box)
-3. Use request_observation to see the result
-4. Based on new screenshot, perform next action
-5. Continue until task is complete
-6. Use complete_task with a summary
+## WRONG vs RIGHT Examples
+WRONG: "I'll click the search box now" (just a message, no action)
+RIGHT: [click_element on search box] + [request_observation] (actual action taken)
+
+WRONG: "Let me search for bike helmets" (just explanation)  
+RIGHT: [fill_form_field with "bike helmet"] + [click_element on search button] + [request_observation]
+
+## Multi-Step Task Execution
+For ANY task:
+1. IMMEDIATELY perform the first action (don't just explain)
+2. Call request_observation in the same response
+3. When you get the new screenshot, perform the next action
+4. Continue until task is VERIFIABLY complete
+5. Call complete_task with a summary
 
 ## Safety Rules
-- NEVER click payment/purchase/delete buttons automatically
+- NEVER click payment/purchase/delete buttons without first asking user for confirmation
 - NEVER fill password or credit card fields
-- Always explain what you're about to do
-- If unsure, ask the user
+- If you need to ask a question, that's the ONE case where send_message alone is okay
 
 ## Using Selectors
 - Each element in the list has a pre-generated "selector" field - USE THAT EXACT SELECTOR
 - Match visual elements in the screenshot with elements in the list using their text/type/position
-- Example: If you see a "Sign In" button, find it in the element list and use its exact selector
+- If element not found, try scrolling or look for alternative elements
 
-IMPORTANT: You are looking at a REAL screenshot. Describe what you actually see, not what you assume. Be specific about element locations (top-right, center, etc.).`;
+REMEMBER: You are an ACTION-ORIENTED agent. Don't narrate - ACT. Every response should include at least one action tool call (click, fill, scroll, etc.) unless you need clarification from the user.`;
 
 // Initialize the model with tool binding using OpenRouter
 function createAgent() {
@@ -316,7 +328,7 @@ function buildHumanMessage(
   if (isFollowUp) {
     content.push({
       type: "text",
-      text: `[OBSERVATION AFTER ACTIONS]\nThe previous actions have been executed. Here is the current state of the page:\n\nURL: ${pageState.url}`,
+      text: `[VERIFICATION - FRESH SCREENSHOT]\nYour previous actions have been executed. This is a NEW screenshot of the current page state.\n\nURL: ${pageState.url}\n\nCRITICAL: Analyze this screenshot to verify if your actions worked. Look for changes compared to before. If the task is not complete, continue with more actions.`,
     });
   } else {
     content.push({
@@ -336,10 +348,17 @@ function buildHumanMessage(
       },
     });
 
-    content.push({
-      type: "text",
-      text: "Above is a screenshot of the current webpage. Analyze it carefully to identify interactive elements, their positions, and visual context.",
-    });
+    if (isFollowUp) {
+      content.push({
+        type: "text",
+        text: "This is a FRESH screenshot taken AFTER your previous actions. Compare what you see now vs what you expected. Did the action succeed? Is the task complete? If not, what's the next step?",
+      });
+    } else {
+      content.push({
+        type: "text",
+        text: "Above is a screenshot of the current webpage. Analyze it carefully to identify interactive elements, their positions, and visual context.",
+      });
+    }
   } else {
     content.push({
       type: "text",
@@ -358,7 +377,7 @@ function buildHumanMessage(
   if (isFollowUp) {
     content.push({
       type: "text",
-      text: "\nAnalyze the current state. Did the previous actions work? What should be done next to complete the user's task?",
+      text: "\nBased on the current screenshot, answer:\n1. Did my previous action work? What changed?\n2. Is the user's original task complete? If yes, call complete_task.\n3. If not complete, what's the next action to take?\n\nDo NOT give up - keep trying until the task is verifiably complete.",
     });
   } else {
     content.push({
@@ -396,10 +415,21 @@ export async function processUserRequest(
     new SystemMessage(SYSTEM_PROMPT),
   ];
 
-  // Add conversation history if this is a follow-up
-  const isFollowUp = conversationHistory.length > 0;
+  // Add conversation history to provide context
+  if (conversationHistory.length > 0) {
+    // Add a summary message about the conversation context
+    const historyContext = conversationHistory
+      .slice(-10) // Keep last 10 messages for context
+      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n");
+    
+    messages.push(new HumanMessage({
+      content: `[CONVERSATION HISTORY - Use this context to understand what was previously discussed]\n${historyContext}\n\n[END OF HISTORY - The user's new message is below]`
+    }));
+  }
 
   // Add the current observation
+  const isFollowUp = conversationHistory.length > 0;
   messages.push(buildHumanMessage(message, pageState, isFollowUp));
 
   try {

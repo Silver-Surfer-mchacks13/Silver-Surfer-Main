@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
   try {
     // Parse request body
     const body = (await req.json()) as ConversationRequest;
-    const { session_id, title, message, page_state } = body;
+    const { session_id, title, message, page_state, conversation_history } = body;
 
     // Validate required fields
     if (!page_state) {
@@ -233,7 +233,8 @@ export async function POST(req: NextRequest) {
       screenshotLength: page_state.screenshot?.length || 0,
       hasDistilledDOM: !!page_state.distilledDOM,
       elementCount: page_state.distilledDOM?.elements?.length || 0,
-      url: page_state.url
+      url: page_state.url,
+      historyLength: conversation_history?.length || 0
     });
 
     // Get or create TaskSession
