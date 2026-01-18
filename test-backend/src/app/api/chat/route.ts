@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processUserRequest } from "@/lib/agent";
 import type { ConversationRequest, ConversationResponse } from "@/lib/types";
+import { optionalAuth } from "@/lib/utils/auth";
 
-// Handle CORS preflight requests
+/**
+ * @swagger
+ * /api/chat:
+ *   options:
+ *     tags: [Chat]
+ *     summary: CORS preflight
+ *     description: Handles CORS preflight requests
+ *     responses:
+ *       200:
+ *         description: CORS preflight successful
+ */
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -14,6 +25,175 @@ export async function OPTIONS() {
   });
 }
 
+/**
+ * @swagger
+ * /api/chat:
+ *   post:
+ *     tags: [Chat]
+ *     summary: Process user conversation request
+ *     description: Processes a user message and page state, returning actions for the browser agent
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message, page_state]
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *                 description: Optional session identifier for conversation continuity
+ *                 example: "550e8400-e29b-41d4-a716-446655440000"
+ *               title:
+ *                 type: string
+ *                 description: Title of the conversation
+ *                 example: "Find product information"
+ *               message:
+ *                 type: string
+ *                 description: The user message/instruction
+ *                 example: "Click on the search button"
+ *               page_state:
+ *                 type: object
+ *                 required: [url, html, screenshot]
+ *                 properties:
+ *                   url:
+ *                     type: string
+ *                     format: uri
+ *                     description: Current page URL
+ *                     example: "https://example.com"
+ *                   html:
+ *                     type: string
+ *                     description: Current page HTML content
+ *                   screenshot:
+ *                     type: string
+ *                     format: byte
+ *                     description: Base64 encoded screenshot of the current page
+ *     responses:
+ *       200:
+ *         description: Successfully processed request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 session_id:
+ *                   type: string
+ *                   example: "550e8400-e29b-41d4-a716-446655440000"
+ *                 actions:
+ *                   type: array
+ *                   items:
+ *                     oneOf:
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [click]
+ *                           x_path:
+ *                             type: string
+ *                             description: CSS selector or XPath
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [wait]
+ *                           duration:
+ *                             type: number
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [message]
+ *                           message:
+ *                             type: string
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [complete]
+ *                           message:
+ *                             type: string
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [highlight, magnify, scroll]
+ *                           selector:
+ *                             type: string
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [fill_form, select_dropdown]
+ *                           selector:
+ *                             type: string
+ *                           value:
+ *                             type: string
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                       - type: object
+ *                         properties:
+ *                           action_type:
+ *                             type: string
+ *                             enum: [remove_highlights, reset_magnification, remove_clutter, restore_clutter]
+ *                           timestamp:
+ *                             type: string
+ *                             format: date-time
+ *                           reasoning:
+ *                             type: string
+ *                 complete:
+ *                   type: boolean
+ *                   description: Whether the task is complete
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Missing required field: page_state"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Internal server error"
+ *                 message:
+ *                   type: string
+ */
 export async function POST(req: NextRequest) {
   try {
     // Parse request body
@@ -35,10 +215,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Optional: Extract user ID from token if present (for future session association)
+    const authInfo = optionalAuth(req);
+    const userId = authInfo?.userId || null;
+
     // Log for debugging
     console.log("Received request:", {
       message,
       title,
+      userId: userId || 'anonymous',
       hasScreenshot: !!page_state.screenshot,
       screenshotLength: page_state.screenshot?.length || 0,
       htmlLength: page_state.html?.length || 0,
@@ -46,6 +231,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Process the request with the agent - use the actual user message
+    // Note: userId is extracted but not yet used - will be used for session persistence later
     const { actions, complete } = await processUserRequest(message, page_state);
 
     // Build the response
@@ -78,7 +264,31 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Health check endpoint
+/**
+ * @swagger
+ * /api/chat:
+ *   get:
+ *     tags: [Chat]
+ *     summary: Health check endpoint
+ *     description: Returns the health status of the API service
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ok"
+ *                 service:
+ *                   type: string
+ *                   example: "Silver Surfer API"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
 export async function GET() {
   return NextResponse.json(
     {
