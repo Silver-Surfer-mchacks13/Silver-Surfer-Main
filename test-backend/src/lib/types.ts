@@ -148,6 +148,10 @@ export interface ConversationRequest {
   title: string;
   message: string;  // The actual user message
   page_state: PageState;
+  conversation_history?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
 }
 
 export interface ConversationResponse {

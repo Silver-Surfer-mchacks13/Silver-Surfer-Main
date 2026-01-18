@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     // Parse request body
     const body = (await req.json()) as ConversationRequest;
-    const { session_id, title, message, page_state } = body;
+    const { session_id, title, message, page_state, conversation_history } = body;
 
     // Validate required fields
     if (!page_state) {
@@ -43,11 +43,16 @@ export async function POST(req: NextRequest) {
       screenshotLength: page_state.screenshot?.length || 0,
       hasDistilledDOM: !!page_state.distilledDOM,
       elementCount: page_state.distilledDOM?.elements?.length || 0,
-      url: page_state.url
+      url: page_state.url,
+      historyLength: conversation_history?.length || 0
     });
 
-    // Process the request with the agent - use the actual user message
-    const { actions, complete, needsObservation } = await processUserRequest(message, page_state);
+    // Process the request with the agent - include conversation history
+    const { actions, complete, needsObservation } = await processUserRequest(
+      message,
+      page_state,
+      conversation_history || []
+    );
 
     // Build the response
     const response: ConversationResponse = {

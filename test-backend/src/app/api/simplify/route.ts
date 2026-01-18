@@ -27,7 +27,7 @@ const SIMPLIFY_SYSTEM_PROMPT = `You are Silver Surfer's Page Simplification AI. 
 You will receive:
 1. A user's request describing what they want to focus on
 2. A screenshot of the current webpage  
-3. A structured list of page elements with their CSS selectors
+3. A structured list of page elements with their CSS selectors, image src URLs, and link hrefs
 
 Your task is to CREATE a simplified view by extracting relevant content into organized sections.
 
@@ -39,23 +39,25 @@ OUTPUT STRUCTURE:
 
 CONTENT TYPES:
 - "text": Paragraphs, headings, descriptions
-- "link": Clickable links (include href)
+- "link": Clickable links (include the actual href from the element list)
 - "button": Action buttons (add to cart, submit, etc.)
-- "image": Product images, article images (include src)
+- "image": Product images, article images (MUST include the actual src URL from the element list)
 - "input": Form fields the user might need
 
 IMPORTANT RULES:
 - Extract ACTUAL content from the page (text, prices, product names)
 - Use the exact CSS selectors from the element list
+- For images: You MUST copy the exact "src" URL from the element list - do NOT make up or guess image URLs
+- For links: Use the exact "href" from the element list
 - Group related items into logical sections
-- For products: include name, price, image, and add-to-cart button
-- For articles: include title, main text paragraphs, images
+- For products: include name, price, image (with real src URL), and add-to-cart button
+- For articles: include title, main text paragraphs, images (with real src URLs)
 - Keep forms intact with all their inputs
 - Focus on what the user asked for, ignore distractions
 
 Examples:
-- "Products only" → Extract product cards with names, prices, images, buy buttons
-- "Article focus" → Extract article title, paragraphs, inline images
+- "Products only" → Extract product cards with names, prices, images (using actual src URLs), buy buttons
+- "Article focus" → Extract article title, paragraphs, inline images (using actual src URLs)
 - "Show prices under $50" → Filter products by price, show only matching ones`;
 
 // Create the model with structured output
@@ -94,7 +96,9 @@ function formatDistilledDOM(dom: any, maxElements: number = 200): string {
 
     if (el.text) line += ` text="${el.text.substring(0, 40)}${el.text.length > 40 ? '...' : ''}"`;
     if (el.ariaLabel) line += ` aria="${el.ariaLabel}"`;
-    if (el.href) line += ` [link]`;
+    if (el.alt) line += ` alt="${el.alt}"`;
+    if (el.src) line += ` src="${el.src}"`;
+    if (el.href) line += ` href="${el.href}"`;
     if (el.isInteractive) line += ` [interactive]`;
 
     output += line + "\n";
