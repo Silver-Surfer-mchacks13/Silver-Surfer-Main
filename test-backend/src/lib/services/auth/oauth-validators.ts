@@ -674,13 +674,11 @@ export class TokenValidationServiceFactory {
   private readonly googleService: GoogleTokenValidationService;
   private readonly microsoftService: MicrosoftTokenValidationService;
   private readonly githubService: GitHubTokenValidationService;
-  private readonly auth0Service: Auth0TokenValidationService;
 
   constructor() {
     this.googleService = new GoogleTokenValidationService();
     this.microsoftService = new MicrosoftTokenValidationService();
     this.githubService = new GitHubTokenValidationService();
-    this.auth0Service = new Auth0TokenValidationService();
   }
 
   getValidator(provider: AuthProvider): ITokenValidationService {
@@ -691,8 +689,6 @@ export class TokenValidationServiceFactory {
         return this.microsoftService;
       case 'GitHub':
         return this.githubService;
-      case 'Auth0':
-        return this.auth0Service;
       default:
         throw new Error(`OAuth provider '${provider}' is not supported`);
     }

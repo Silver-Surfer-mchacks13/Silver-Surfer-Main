@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { AuthProvider } from '@/lib/db/supabase';
 
-// Auth Provider Enum
-export const AuthProviderEnum = z.enum(['Local', 'Google', 'Microsoft', 'GitHub', 'Auth0']);
+// Auth Provider Enum (for OAuth endpoint - Auth0 removed, use separate /api/auth/auth0 endpoint)
+export const AuthProviderEnum = z.enum(['Local', 'Google', 'Microsoft', 'GitHub']);
 export type AuthProviderType = z.infer<typeof AuthProviderEnum>;
 
 // Request DTOs
@@ -75,3 +75,18 @@ export const ConfirmPasswordResetRequestSchema = z.object({
 });
 
 export type ConfirmPasswordResetRequest = z.infer<typeof ConfirmPasswordResetRequestSchema>;
+
+// Auth0 Profile Request DTOs
+export const Auth0ProfileRequestSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  email_verified: z.boolean(),
+  sub: z.string().min(1, 'Provider user ID (sub) is required'),
+  name: z.string().optional(),
+  given_name: z.string().optional(),
+  family_name: z.string().optional(),
+  nickname: z.string().optional(),
+  picture: z.string().url('Invalid picture URL').optional().or(z.literal('')),
+  updated_at: z.string().optional(),
+});
+
+export type Auth0ProfileRequest = z.infer<typeof Auth0ProfileRequestSchema>;

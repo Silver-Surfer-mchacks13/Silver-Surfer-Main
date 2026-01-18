@@ -86,7 +86,7 @@ export class AuthService {
   }
 
   /**
-   * Login with OAuth provider (Google, Microsoft, GitHub, Auth0)
+   * Login with OAuth provider (Google, Microsoft, GitHub)
    */
   async loginWithOAuthAsync(request: OAuthLoginRequest): Promise<AuthResponse> {
     const provider = request.provider as AuthProvider;
@@ -119,15 +119,6 @@ export class AuthService {
         }
         if (!clientSecret) {
           throw new Error('GitHub Client Secret is not configured');
-        }
-        break;
-      case 'Auth0':
-        clientId = process.env.OAUTH_AUTH0_CLIENT_ID || '';
-        if (!clientId) {
-          throw new Error('Auth0 Client ID is not configured');
-        }
-        if (!process.env.OAUTH_AUTH0_DOMAIN) {
-          throw new Error('Auth0 Domain is not configured');
         }
         break;
       default:
@@ -172,6 +163,14 @@ export class AuthService {
       validationResult.userId,
       validationResult.email
     );
+  }
+
+  /**
+   * Login with Auth0 profile (separate endpoint, not part of OAuth flow)
+   */
+  async loginWithAuth0ProfileAsync(profile: { email: string; sub: string }): Promise<AuthResponse> {
+    // Validate email_verified if provided (but we'll accept the profile as-is)
+    return this.loginWithOAuthAsyncInternal('Auth0', profile.sub, profile.email);
   }
 
   /**

@@ -60,13 +60,6 @@ import { NextRequest, NextResponse } from 'next/server';
  *                           type: string
  *                         clientSecret:
  *                           type: string
- *                     auth0:
- *                       type: object
- *                       properties:
- *                         domain:
- *                           type: string
- *                         clientId:
- *                           type: string
  */
 export async function GET(req: NextRequest) {
   // Check JWT config
@@ -114,8 +107,6 @@ export async function GET(req: NextRequest) {
   const oauthMicrosoftTenant = process.env.OAUTH_MICROSOFT_TENANT_ID;
   const oauthGithubId = process.env.OAUTH_GITHUB_CLIENT_ID;
   const oauthGithubSecret = process.env.OAUTH_GITHUB_CLIENT_SECRET;
-  const oauthAuth0Domain = process.env.OAUTH_AUTH0_DOMAIN;
-  const oauthAuth0Id = process.env.OAUTH_AUTH0_CLIENT_ID;
 
   const response = {
     jwt: {
@@ -147,10 +138,6 @@ export async function GET(req: NextRequest) {
       github: {
         clientId: oauthGithubId || null,
         clientSecret: oauthGithubSecret || null,
-      },
-      auth0: {
-        domain: oauthAuth0Domain || null,
-        clientId: oauthAuth0Id || null,
       },
     },
     status: {

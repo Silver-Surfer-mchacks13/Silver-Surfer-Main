@@ -20,7 +20,7 @@ export async function OPTIONS() {
  *   post:
  *     tags: [Auth]
  *     summary: Authenticate with OAuth provider
- *     description: Login or register using OAuth provider (Google, Microsoft, GitHub, or Auth0)
+ *     description: Login or register using OAuth provider (Google, Microsoft, or GitHub)
  *     requestBody:
  *       required: true
  *       content:
@@ -31,10 +31,10 @@ export async function OPTIONS() {
  *             properties:
  *               provider:
  *                 type: string
- *                 enum: [Google, Microsoft, GitHub, Auth0]
+ *                 enum: [Google, Microsoft, GitHub]
  *               idToken:
  *                 type: string
- *                 description: ID token for Google/Microsoft/Auth0 (ID token flow)
+ *                 description: ID token for Google/Microsoft (ID token flow)
  *               authorizationCode:
  *                 type: string
  *                 description: Authorization code for GitHub (authorization code flow)
