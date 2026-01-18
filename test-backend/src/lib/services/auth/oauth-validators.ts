@@ -457,17 +457,230 @@ export class GitHubTokenValidationService implements ITokenValidationService {
 }
 
 /**
+ * Auth0 OAuth token validation service
+ * Uses ID token flow with JWKS signature verification
+ */
+export class Auth0TokenValidationService implements ITokenValidationService {
+  private jwksCache: Map<string, { keys: any[]; expiresAt: number }> = new Map();
+  private readonly cacheTTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+  /**
+   * Fetch Auth0's JWKS (JSON Web Key Set) for token verification
+   */
+  private async fetchJWKS(domain: string): Promise<any[]> {
+    const cacheKey = domain;
+    const cached = this.jwksCache.get(cacheKey);
+
+    // Return cached keys if still valid
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.keys;
+    }
+
+    try {
+      const jwksUrl = `https://${domain}/.well-known/jwks.json`;
+      const response = await fetch(jwksUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Auth0 JWKS: ${response.statusText}`);
+      }
+
+      const jwks = await response.json();
+
+      if (!jwks.keys || !Array.isArray(jwks.keys)) {
+        throw new Error('Invalid JWKS format from Auth0');
+      }
+
+      // Cache the keys with expiration
+      this.jwksCache.set(cacheKey, {
+        keys: jwks.keys,
+        expiresAt: Date.now() + this.cacheTTL,
+      });
+
+      return jwks.keys;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch Auth0 JWKS: ${error.message}`);
+      }
+      throw new Error('Failed to fetch Auth0 JWKS');
+    }
+  }
+
+  /**
+   * Convert JWK to PEM format for jwt.verify
+   */
+  private jwkToPem(jwk: any): string {
+    if (jwk.kty !== 'RSA') {
+      throw new Error(`Unsupported key type: ${jwk.kty}`);
+    }
+
+    // Create RSA public key using Node.js crypto
+    const publicKey = crypto.createPublicKey({
+      key: {
+        kty: 'RSA',
+        n: jwk.n,
+        e: jwk.e,
+      },
+      format: 'jwk',
+    });
+
+    // Export as PEM
+    return publicKey.export({
+      type: 'spki',
+      format: 'pem',
+    }) as string;
+  }
+
+  async validateIdTokenAsync(
+    idToken: string,
+    expectedClientId: string
+  ): Promise<TokenValidationResult> {
+    if (!idToken || idToken.trim().length === 0) {
+      throw new Error('ID token is required');
+    }
+
+    if (!expectedClientId || expectedClientId.trim().length === 0) {
+      throw new Error('Auth0 Client ID is not configured');
+    }
+
+    try {
+      // Get Auth0 domain from environment
+      const domain = process.env.OAUTH_AUTH0_DOMAIN;
+      if (!domain || domain.trim().length === 0) {
+        throw new Error('Auth0 Domain is not configured');
+      }
+
+      // Decode token header to get key ID (kid)
+      const decodedHeader = jwt.decode(idToken, { complete: true });
+      if (!decodedHeader || typeof decodedHeader === 'string') {
+        throw new Error('Invalid Auth0 ID token format');
+      }
+
+      const header = decodedHeader.header;
+      if (!header.kid) {
+        throw new Error('Auth0 ID token missing key ID (kid)');
+      }
+
+      // Fetch JWKS and get the public key
+      const jwks = await this.fetchJWKS(domain);
+      const key = jwks.find((k: any) => k.kid === header.kid);
+
+      if (!key) {
+        throw new Error(`Key with kid '${header.kid}' not found in Auth0 JWKS`);
+      }
+
+      // Decode token to get payload
+      const decoded = jwt.decode(idToken, { complete: true });
+      
+      if (!decoded || typeof decoded === 'string') {
+        throw new Error('Invalid Auth0 ID token format');
+      }
+
+      const payload = decoded.payload as any;
+
+      // Verify issuer
+      const issuer = `https://${domain}/`;
+      if (payload.iss !== issuer) {
+        throw new Error(`Auth0 ID token issuer mismatch. Expected: ${issuer}, Got: ${payload.iss}`);
+      }
+
+      // Verify audience
+      const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+      if (!audiences.includes(expectedClientId)) {
+        throw new Error(`Auth0 ID token audience mismatch. Expected: ${expectedClientId}, Got: ${payload.aud}`);
+      }
+
+      // Verify expiration
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Auth0 ID token has expired');
+      }
+
+      // Verify not before
+      if (payload.nbf && payload.nbf > Math.floor(Date.now() / 1000)) {
+        throw new Error('Auth0 ID token is not yet valid');
+      }
+
+      // Extract required fields
+      if (!payload.sub) {
+        throw new Error('Auth0 ID token missing user ID (sub)');
+      }
+
+      // Email might be in 'email' claim
+      const email = payload.email;
+      if (!email) {
+        throw new Error('Auth0 ID token missing email');
+      }
+
+      // Verify email is verified if claim exists
+      if (payload.email_verified === false) {
+        throw new Error('Auth0 email is not verified');
+      }
+
+      // Verify signature using the public key from JWKS
+      try {
+        // Convert JWK to PEM and verify
+        const publicKeyPem = this.jwkToPem(key);
+        jwt.verify(idToken, publicKeyPem, {
+          algorithms: ['RS256'],
+          issuer,
+          audience: expectedClientId,
+        });
+      } catch (verifyError) {
+        if (verifyError instanceof jwt.JsonWebTokenError) {
+          throw new Error(`Auth0 ID token signature verification failed: ${verifyError.message}`);
+        }
+        if (verifyError instanceof jwt.TokenExpiredError) {
+          throw new Error('Auth0 ID token has expired');
+        }
+        if (verifyError instanceof jwt.NotBeforeError) {
+          throw new Error('Auth0 ID token is not yet valid');
+        }
+        throw verifyError;
+      }
+
+      return {
+        userId: payload.sub,
+        email: email.toLowerCase(),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        // Don't expose internal errors, provide user-friendly messages
+        if (error.message.includes('expired')) {
+          throw new Error('Auth0 ID token has expired');
+        }
+        if (error.message.includes('signature')) {
+          throw new Error('Auth0 ID token signature validation failed');
+        }
+        if (error.message.includes('audience') || error.message.includes('issuer')) {
+          throw new Error('Auth0 ID token validation failed: invalid audience or issuer');
+        }
+        if (error.message.includes('not configured')) {
+          throw error; // Re-throw configuration errors as-is
+        }
+        throw new Error(`Invalid Auth0 ID token: ${error.message}`);
+      }
+      throw new Error('Failed to validate Auth0 ID token');
+    }
+  }
+
+  async validateAuthorizationCodeAsync(): Promise<TokenValidationResult> {
+    throw new Error('Auth0 OAuth uses ID token flow, not authorization code flow');
+  }
+}
+
+/**
  * Factory to get the appropriate token validation service for a provider
  */
 export class TokenValidationServiceFactory {
   private readonly googleService: GoogleTokenValidationService;
   private readonly microsoftService: MicrosoftTokenValidationService;
   private readonly githubService: GitHubTokenValidationService;
+  private readonly auth0Service: Auth0TokenValidationService;
 
   constructor() {
     this.googleService = new GoogleTokenValidationService();
     this.microsoftService = new MicrosoftTokenValidationService();
     this.githubService = new GitHubTokenValidationService();
+    this.auth0Service = new Auth0TokenValidationService();
   }
 
   getValidator(provider: AuthProvider): ITokenValidationService {
@@ -478,6 +691,8 @@ export class TokenValidationServiceFactory {
         return this.microsoftService;
       case 'GitHub':
         return this.githubService;
+      case 'Auth0':
+        return this.auth0Service;
       default:
         throw new Error(`OAuth provider '${provider}' is not supported`);
     }

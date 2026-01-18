@@ -62,12 +62,17 @@ OAUTH_MICROSOFT_TENANT_ID=common
 # GitHub OAuth (optional)
 OAUTH_GITHUB_CLIENT_ID=your-github-client-id
 OAUTH_GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Auth0 OAuth (optional)
+OAUTH_AUTH0_DOMAIN=your-tenant.auth0.com
+OAUTH_AUTH0_CLIENT_ID=your-auth0-client-id
 ```
 
 **How to get OAuth credentials:**
 - **Google**: https://console.cloud.google.com/apis/credentials
 - **Microsoft**: https://portal.azure.com → App registrations
 - **GitHub**: https://github.com/settings/developers → OAuth Apps
+- **Auth0**: https://auth0.com → Create Application → Copy Domain and Client ID
 
 ## File Location
 
@@ -85,4 +90,6 @@ OPENAI_API_KEY=sk-...
 OAUTH_GOOGLE_CLIENT_ID=
 OAUTH_MICROSOFT_CLIENT_ID=
 OAUTH_GITHUB_CLIENT_ID=
+OAUTH_AUTH0_DOMAIN=
+OAUTH_AUTH0_CLIENT_ID=
 ```

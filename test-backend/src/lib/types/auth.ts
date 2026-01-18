@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { AuthProvider } from '@/lib/db/supabase';
 
 // Auth Provider Enum
-export const AuthProviderEnum = z.enum(['Local', 'Google', 'Microsoft', 'GitHub']);
+export const AuthProviderEnum = z.enum(['Local', 'Google', 'Microsoft', 'GitHub', 'Auth0']);
 export type AuthProviderType = z.infer<typeof AuthProviderEnum>;
 
 // Request DTOs

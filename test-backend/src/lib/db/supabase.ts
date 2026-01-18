@@ -98,7 +98,7 @@ export function table(tableName: string) {
 }
 
 // Database types (matching C# models exactly)
-export type AuthProvider = 'Local' | 'Google' | 'Microsoft' | 'GitHub';
+export type AuthProvider = 'Local' | 'Google' | 'Microsoft' | 'GitHub' | 'Auth0';
 
 // User model (matching C# User class)
 export interface User {
