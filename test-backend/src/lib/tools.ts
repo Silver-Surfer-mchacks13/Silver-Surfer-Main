@@ -66,6 +66,10 @@ export const completeTaskSchema = z.object({
   message: z.string().describe("A completion message summarizing what was accomplished"),
 });
 
+export const requestObservationSchema = z.object({
+  reasoning: z.string().optional().describe("Why you need to see the updated page state"),
+});
+
 // Create LangChain tools
 
 export const clickElementTool = tool(
@@ -211,6 +215,17 @@ export const completeTaskTool = tool(
   }
 );
 
+export const requestObservationTool = tool(
+  async (input) => {
+    return JSON.stringify({ tool: "request_observation", ...input });
+  },
+  {
+    name: "request_observation",
+    description: "Request a fresh screenshot and HTML of the current page state. Use this AFTER performing actions to verify they worked and to see the updated page before deciding on next steps. Essential for multi-step tasks like 'search for X and add to cart'.",
+    schema: requestObservationSchema,
+  }
+);
+
 // Export all tools as an array
 export const allTools = [
   clickElementTool,
@@ -226,4 +241,5 @@ export const allTools = [
   waitTool,
   sendMessageTool,
   completeTaskTool,
+  requestObservationTool,
 ];

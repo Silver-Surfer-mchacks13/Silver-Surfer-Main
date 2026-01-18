@@ -99,9 +99,47 @@ export type ConversationAction =
   | RemoveClutterAction
   | RestoreClutterAction;
 
+// Distilled DOM types
+export interface DOMElement {
+  index: number;
+  selector: string;
+  tag: string;
+  type?: string;
+  role?: string;
+  text?: string;
+  placeholder?: string;
+  value?: string;
+  href?: string;
+  src?: string;
+  alt?: string;
+  ariaLabel?: string;
+  isVisible: boolean;
+  isInteractive: boolean;
+  options?: string[];
+}
+
+export interface DistilledDOM {
+  url: string;
+  title: string;
+  metaDescription: string | null;
+  fullText: string;
+  timestamp: string;
+  viewport: { width: number; height: number };
+  summary: {
+    totalElements: number;
+    interactiveElements: number;
+    headings: number;
+    links: number;
+    buttons: number;
+    inputs: number;
+    images: number;
+  };
+  elements: DOMElement[];
+}
+
 export interface PageState {
   url: string;
-  html: string;
+  distilledDOM: DistilledDOM | null; // Structured page content
   screenshot: string; // Base64 data URL
 }
 
@@ -116,4 +154,5 @@ export interface ConversationResponse {
   session_id: string;
   actions: ConversationAction[];
   complete: boolean;
+  needs_observation: boolean; // True if agent wants to see updated page state after actions execute
 }
