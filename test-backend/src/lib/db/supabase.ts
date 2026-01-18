@@ -131,3 +131,24 @@ export interface PasswordResetRequest {
   ExpiresAt: string;  // DateTime in C#
   CreatedAt: string;  // DateTime in C#
 }
+
+// TaskSession model (matching C# TaskSession class)
+export interface TaskSession {
+  id: string;  // Guid in C#
+  UserId: string | null;  // Guid? in C#
+  Title: string;  // required string
+  CreatedAt: string;  // DateTime in C#
+  UpdatedAt: string;  // DateTime in C#
+  CompletedAt: string | null;  // DateTime? in C#
+}
+
+// ConversationMessage model
+export interface ConversationMessage {
+  id: string;  // Guid
+  SessionId: string;  // Guid - foreign key to TaskSessions
+  UserId: string | null;  // Guid? - foreign key to users (optional)
+  role: 'user' | 'assistant';  // Message role
+  content: string;  // Message content (TEXT)
+  PageUrl: string | null;  // URL when message was sent (optional)
+  CreatedAt: string;  // DateTime
+}

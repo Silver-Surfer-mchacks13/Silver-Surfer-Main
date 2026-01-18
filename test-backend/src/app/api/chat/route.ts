@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processUserRequest } from "@/lib/agent";
 import type { ConversationRequest, ConversationResponse } from "@/lib/types";
 import { optionalAuth } from "@/lib/utils/auth";
+import { conversationService } from "@/lib/services/conversation/conversation-service";
 
 /**
  * @swagger
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Optional: Extract user ID from token if present (for future session association)
+    // Extract user ID from token if present
     const authInfo = optionalAuth(req);
     const userId = authInfo?.userId || null;
 
@@ -230,13 +231,53 @@ export async function POST(req: NextRequest) {
       url: page_state.url
     });
 
-    // Process the request with the agent - use the actual user message
-    // Note: userId is extracted but not yet used - will be used for session persistence later
+    // Get or create TaskSession
+    const sessionTitle = title || message.substring(0, 100) || 'New Conversation';
+    const taskSession = await conversationService.getOrCreateSession(
+      session_id,
+      userId,
+      sessionTitle
+    );
+
+    // Store user message
+    await conversationService.storeMessage(
+      taskSession.id,
+      userId,
+      'user',
+      message,
+      page_state.url
+    );
+
+    // Process the request with the agent
     const { actions, complete } = await processUserRequest(message, page_state);
+
+    // Store agent responses (extract text from message actions)
+    for (const action of actions) {
+      if (action.action_type === 'message') {
+        await conversationService.storeMessage(
+          taskSession.id,
+          userId,
+          'assistant',
+          action.message,
+          page_state.url
+        );
+      } else if (action.action_type === 'complete') {
+        await conversationService.storeMessage(
+          taskSession.id,
+          userId,
+          'assistant',
+          action.message,
+          page_state.url
+        );
+      }
+    }
+
+    // Update session completion status
+    await conversationService.updateSessionCompletion(taskSession.id, complete);
 
     // Build the response
     const response: ConversationResponse = {
-      session_id: session_id || crypto.randomUUID(),
+      session_id: taskSession.id,
       actions,
       complete,
     };
